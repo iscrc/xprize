@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Causal Froth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+<style>
+/* Layout: lab bench. The world on the left, the scoreboard and instruments on the right, the dials underneath. */
+:root {
+  --bg: #f3f4f6; --surface: #ffffff; --ink: #18202c; --muted: #596273; --line: #d8dce3; --accent: #2b6a88;
+  --font-display: "Newsreader", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --c0: #8f99a6; --c1: #e8892f; --c2: #3a86d6; --c3: #d4467a;
+  --good: #2e8b57; --warn: #b7791f; --bad: #c0392b;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f131a; --surface: #161b24; --ink: #e6e9ef; --muted: #9aa3b3; --line: #29303d; --accent: #7db6d4;
+    --c0: #a3acb8; --c1: #f29a45; --c2: #5aa3f0; --c3: #ec6395;
+    --good: #4cc27f; --warn: #e0a43a; --bad: #ef6a5b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f131a; --surface: #161b24; --ink: #e6e9ef; --muted: #9aa3b3; --line: #29303d; --accent: #7db6d4;
+  --c0: #a3acb8; --c1: #f29a45; --c2: #5aa3f0; --c3: #ec6395;
+  --good: #4cc27f; --warn: #e0a43a; --bad: #ef6a5b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 20px 40px; display: grid; gap: 16px; }
+header { display: grid; gap: 4px; }
+h1 { font: 500 30px/1.1 var(--font-display); margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 78ch; }
+.main { display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .main { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.card h2 { font: 600 12px/1.2 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.world { position: relative; aspect-ratio: 1 / 1; width: 100%; border-radius: 6px; overflow: hidden; background: #0b0f14; }
+.world canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button { font: 500 13px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); min-width: 76px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select, input[type="number"] { font: 13px var(--font-mono); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
+input[type="number"] { width: 72px; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+.tick { margin-left: auto; color: var(--muted); font-size: 13px; }
+.score { display: grid; gap: 6px; }
+.row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 54px 64px 82px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row.head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding-top: 0; }
+.sw { width: 12px; height: 12px; border-radius: 50%; }
+.nm b { font-weight: 600; }
+.nm span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.num { text-align: right; }
+.pill { justify-self: end; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 8px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); } .pill.off { color: var(--muted); }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 560px) { .charts { grid-template-columns: 1fr; } }
+.chart { display: grid; gap: 4px; min-width: 0; }
+.chart canvas { width: 100%; height: 130px; display: block; }
+.chart .cap { font-size: 12px; color: var(--muted); }
+.chart .ttl { font-size: 13px; font-weight: 600; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.ctl { display: grid; gap: 8px; align-content: start; }
+.ctl h3 { margin: 0; font: 600 14px var(--font-body); }
+.ctl .hint { color: var(--muted); font-size: 12px; margin: -4px 0 2px; }
+.sl { display: grid; grid-template-columns: minmax(0, 1fr) 52px; gap: 2px 10px; align-items: center; }
+.sl label { font-size: 13px; }
+.sl output { text-align: right; font: 12px var(--font-mono); color: var(--muted); }
+.sl input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+.agentrow { display: grid; grid-template-columns: 12px minmax(0, 1fr) 72px; gap: 8px; align-items: center; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.note { color: var(--muted); font-size: 12px; max-width: 90ch; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Causal Froth</h1>
+    <p>A flowing field of resource (the froth) and agents that must keep eating it to hold their boundary together. Each kind of agent brings a different amount of causal machinery, and pays for it. Watch who survives, whether the thinkers' model of the flow matches the real flow, and whether they discover the secret order when you switch it on.</p>
+  </header>
+
+  <div class="main">
+    <section class="card" aria-label="World">
+      <div class="bar">
+        <button id="run" class="primary">Pause</button>
+        <button id="step">Step</button>
+        <button id="reset">Reset</button>
+        <label class="chk" for="speed">Speed
+          <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4" selected>4×</option><option value="8">8×</option></select>
+        </label>
+        <label class="chk" for="seed">Seed <input id="seed" type="number" value="7" min="1" max="99999"></label>
+        <span class="tick mono" id="tick">t = 0</span>
+      </div>
+      <div class="world"><canvas id="world" width="576" height="576" aria-label="Simulation view"></canvas></div>
+      <div class="bar">
+        <label class="chk" for="showFlow"><input type="checkbox" id="showFlow" checked> Show true flow</label>
+        <label class="chk" for="reveal"><input type="checkbox" id="reveal"> Reveal secret sites</label>
+      </div>
+      <div class="legend">
+        <span><i style="background:linear-gradient(90deg,#14262a,#3f7d5c,#c7e08a)"></i>Resource (bright = rich)</span>
+        <span><i style="background:#efe6dc"></i>Built wall</span>
+        <span><i style="background:transparent;border:1.5px solid #6fe3ff;border-radius:50%"></i>Cue flash</span>
+        <span><i style="background:transparent;border:1.5px dashed var(--muted);border-radius:50%"></i>Secret site (when revealed)</span>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Scoreboard and instruments">
+      <h2>Who is holding their boundary</h2>
+      <div class="score" id="score"></div>
+      <div class="charts">
+        <div class="chart"><span class="ttl">Population</span><canvas id="chPop"></canvas><span class="cap">Agents alive per kind over time.</span></div>
+        <div class="chart"><span class="ttl">Intake per agent</span><canvas id="chInt"></canvas><span class="cap">Smoothed food per tick. The dashed line is the resting cost for a moving agent.</span></div>
+        <div class="chart"><span class="ttl">Flow model vs. reality</span><canvas id="chFlow"></canvas><span class="cap mono" id="flowCap">Error of the thinkers' flow estimate.</span></div>
+        <div class="chart"><span class="ttl">What a cue predicts</span><canvas id="chLag"></canvas><span class="cap" id="lagCap">Thinkers' learned value of a cue, by ticks since it flashed. Orange line: the true lag.</span></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" aria-label="Controls">
+    <div class="bar" style="justify-content:space-between">
+      <h2>Experiments</h2>
+      <div class="presets">
+        <button data-preset="default">Default world</button>
+        <button data-preset="costly">Thinking is expensive</button>
+        <button data-preset="sitters">Chasers sit and wait</button>
+        <button data-preset="sprinters">Chasers sprint</button>
+        <button data-preset="turbulent">Turbulent froth</button>
+        <button data-preset="slow">Slow, still froth</button>
+        <button data-preset="secret">Secret order</button>
+        <button data-preset="nobuild">Secret order, no builders</button>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <h3>The agents</h3>
+        <p class="hint">Kinds and starting numbers apply on Reset.</p>
+        <div id="agentsCtl" style="display:grid;gap:6px"></div>
+        <div class="sl"><label for="chaserSpeed">Chaser pace</label><output id="chaserSpeed_o"></output><input type="range" id="chaserSpeed" min="0" max="3" step="0.25"></div>
+        <p class="hint mono" id="paceHint" style="margin:-2px 0 4px"></p>
+        <div class="sl"><label for="thinkCost">Cost of thinking</label><output id="thinkCost_o"></output><input type="range" id="thinkCost" min="0" max="4" step="0.1"></div>
+        <label class="chk" for="inherit"><input type="checkbox" id="inherit"> Offspring inherit the parent's model</label>
+      </div>
+      <div class="ctl">
+        <h3>The froth</h3>
+        <p class="hint">Live. Coherence is how cleanly the froth moves as chunks: its seaminess.</p>
+        <div class="sl"><label for="driftSpeed">Flow speed</label><output id="driftSpeed_o"></output><input type="range" id="driftSpeed" min="0" max="0.5" step="0.01"></div>
+        <div class="sl"><label for="driftTurn">How fast the flow turns</label><output id="driftTurn_o"></output><input type="range" id="driftTurn" min="0" max="0.01" step="0.0005"></div>
+        <div class="sl"><label for="coherence">Coherence</label><output id="coherence_o"></output><input type="range" id="coherence" min="0" max="1" step="0.05"></div>
+        <div class="sl"><label for="plumes">Resource plumes</label><output id="plumes_o"></output><input type="range" id="plumes" min="1" max="14" step="1"></div>
+        <div class="sl"><label for="decay">Decay of resource</label><output id="decay_o"></output><input type="range" id="decay" min="0.004" max="0.03" step="0.001"></div>
+      </div>
+      <div class="ctl">
+        <h3>Building seams</h3>
+        <p class="hint">Live. Builders wall off a pocket that opens upstream; inside, resource piles up and decays more slowly.</p>
+        <div class="sl"><label for="wallCost">Cost per wall cell</label><output id="wallCost_o"></output><input type="range" id="wallCost" min="0" max="0.2" step="0.005"></div>
+        <div class="sl"><label for="wallDecay">Wall decay per tick</label><output id="wallDecay_o"></output><input type="range" id="wallDecay" min="0.0005" max="0.01" step="0.0005"></div>
+        <div class="sl"><label for="shelter">Shelter (slower decay inside)</label><output id="shelter_o"></output><input type="range" id="shelter" min="0" max="1" step="0.05"></div>
+      </div>
+      <div class="ctl">
+        <h3>Secret order</h3>
+        <p class="hint">Live. Hidden sites flash a cue, then bloom after a fixed lag. Every agent can see the flash; only thinkers can learn what it means.</p>
+        <label class="chk" for="hidden"><input type="checkbox" id="hidden"> Inject secret order</label>
+        <div class="sl"><label for="cueLead">Lag from cue to bloom</label><output id="cueLead_o"></output><input type="range" id="cueLead" min="4" max="60" step="1"></div>
+        <div class="sl"><label for="period">Bloom period</label><output id="period_o"></output><input type="range" id="period" min="70" max="260" step="5"></div>
+        <div class="sl"><label for="bloom">Bloom size</label><output id="bloom_o"></output><input type="range" id="bloom" min="0.5" max="10" step="0.5"></div>
+      </div>
+    </div>
+    <p class="note">How the kinds differ. Drifters (scale 1) walk at random and eat what they bump into. Chasers (reactive baseline) head for the richest cell they can see right now: stimulus, then response. Their pace sets how many steps they take per tick: at zero they never move and their resting drain drops to 40%, so they live like filter feeders on whatever the flow brings; above one, each extra step costs more than the last. Modelers (scale 2) assume the froth has seams: they estimate its flow, head upstream when nothing is in view, treat rivals as part of the world, and learn what a cue predicts. Builders (scale 3) are modelers that also build seams, using their flow estimate to aim the mouth of their pocket. Scale 4 is the secret-order switch. Every agent pays a cost to live and to move; thinkers pay extra each tick for their model.</p>
+  </section>
+</div>
+
+<script>
+// ===== Causal Froth: simulation core =====
+(function (root) {
+  'use strict';
+  const W = 96, H = 96, N = W * H, L = 72; // L = lag bins agents can remember
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const wrapX = (x) => ((x % W) + W) % W;
+  const wrapY = (y) => ((y % H) + H) % H;
+  const idx = (x, y) => wrapY(y) * W + wrapX(x);
+  const wd = (d, n) => { d = ((d % n) + n) % n; return d > n / 2 ? d - n : d; }; // shortest signed offset
+
+  function defaultParams() {
+    return {
+      // the froth (reality)
+      plumes: 7, plumeStrength: 0.03, plumeRadius: 2.5,
+      driftSpeed: 0.35, driftTurn: 0.0015, coherence: 0.85,
+      diffusion: 0.06, decay: 0.012, shelter: 0.8,
+      // secret order
+      hidden: false, sites: 5, period: 140, cueLead: 24, bloom: 4.0,
+      // agents
+      start: [40, 40, 40, 40], enabled: [true, true, true, true],
+      senseR: 6, cueSight: 20, baseCost: 0.018, moveCost: 0.008,
+      brain: [0, 0.002, 0.006, 0.006], thinkCost: 1.0,
+      eatRate: 0.3, reproAt: 5, maxPop: 900,
+      wallCost: 0.02, wallDecay: 0.0025, ringR: 3,
+      curiosity: 0.1, inherit: true, chaserSpeed: 1, predict: false, rivals: true,
+    };
+  }
+
+  function newAgent(S, type, x, y, e, parent) {
+    const a = {
+      id: S.nextId++, type, x, y, e, age: 0, dead: false,
+      hx: 0, hy: 0, intake: 0.03, vx: 0, vy: 0, base: 0.1,
+      mem: [], w: new Float32Array(L), n: new Uint16Array(L),
+      home: null, lowTicks: 0, m: new Float64Array(5),
+    };
+    if (parent && S.P.inherit) {
+      a.vx = parent.vx; a.vy = parent.vy; a.base = parent.base;
+      a.w.set(parent.w); a.n.set(parent.n);
+    }
+    return a;
+  }
+
+  function createSim(params, seed) {
+    const P = Object.assign(defaultParams(), params || {});
+    const rand = rng(seed || 1);
+    const S = {
+      P, rand, seed: seed || 1, t: 0, W, H, L,
+      R: new Float32Array(N), Rp: new Float32Array(N), Rn: new Float32Array(N),
+      wall: new Float32Array(N), UX: new Float32Array(N), UY: new Float32Array(N), tiles: null, occ: new Uint8Array(N), shel: new Float32Array(N), cue: new Float32Array(N),
+      theta: rand() * Math.PI * 2, ux: 0, uy: 0,
+      plumes: [], sites: [], agents: [], nextId: 1,
+      hist: { t: [], pop: [[], [], [], []], intake: [[], [], [], []], order: [], flowErr: [] },
+      births: [0, 0, 0, 0], deaths: [0, 0, 0, 0],
+    };
+    for (let i = 0; i < P.plumes; i++) S.plumes.push({ x: rand() * W, y: rand() * H });
+    for (let i = 0; i < 12; i++) S.sites.push({ x: Math.floor(rand() * W), y: Math.floor(rand() * H), phase: Math.floor(rand() * 1000) });
+    for (let i = 0; i < 80; i++) stepField(S);
+    for (let k = 0; k < 4; k++) {
+      if (!P.enabled[k]) continue;
+      for (let j = 0; j < P.start[k]; j++) S.agents.push(newAgent(S, k, Math.floor(rand() * W), Math.floor(rand() * H), 3));
+    }
+    S.t = 0;
+    record(S);
+    return S;
+  }
+
+  function deposit(S, cx, cy, r, amp) {
+    const R = S.R, reach = Math.ceil(r * 2.5), inv = 1 / (2 * r * r);
+    const ix = Math.round(cx), iy = Math.round(cy);
+    for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
+      const ex = ix + dx - cx, ey = iy + dy - cy;
+      const g = Math.exp(-(ex * ex + ey * ey) * inv);
+      if (g > 0.01) R[idx(ix + dx, iy + dy)] += amp * g;
+    }
+  }
+
+  function stepField(S) {
+    const P = S.P, R = S.R, Rn = S.Rn, wall = S.wall, rand = S.rand;
+    S.Rp.set(R);
+    S.theta += P.driftTurn * (1 + 0.6 * Math.sin(S.t * 0.0013));
+    const ux = P.driftSpeed * Math.cos(S.theta), uy = P.driftSpeed * Math.sin(S.theta);
+    S.ux = ux; S.uy = uy;
+    // turbulence: regional eddies bend the flow; low coherence means a froth without clean seams
+    const TW = 8, TS = W / TW;
+    if (!S.tiles) { S.tiles = new Float32Array(TW * TW); for (let i = 0; i < S.tiles.length; i++) S.tiles[i] = (rand() - 0.5) * 2; }
+    for (let i = 0; i < S.tiles.length; i++) { S.tiles[i] += (rand() - 0.5) * 0.08; S.tiles[i] = Math.max(-1, Math.min(1, S.tiles[i])); }
+    const amp = (1 - P.coherence) * Math.PI, UX = S.UX, UY = S.UY;
+    for (let y = 0; y < H; y++) {
+      const gy = y / TS - 0.5, y0 = Math.floor(gy), fy = gy - y0;
+      for (let x = 0; x < W; x++) {
+        const gx = x / TS - 0.5, x0 = Math.floor(gx), fx = gx - x0;
+        const t00 = S.tiles[((y0 + TW) % TW) * TW + (x0 + TW) % TW], t10 = S.tiles[((y0 + TW) % TW) * TW + (x0 + 1 + TW) % TW];
+        const t01 = S.tiles[((y0 + 1 + TW) % TW) * TW + (x0 + TW) % TW], t11 = S.tiles[((y0 + 1 + TW) % TW) * TW + (x0 + 1 + TW) % TW];
+        const ph = amp * (t00 * (1 - fx) * (1 - fy) + t10 * fx * (1 - fy) + t01 * (1 - fx) * fy + t11 * fx * fy);
+        UX[y * W + x] = P.driftSpeed * Math.cos(S.theta + ph); UY[y * W + x] = P.driftSpeed * Math.sin(S.theta + ph);
+      }
+    }
+
+    // plumes: coherent chunks riding the flow (or not, when coherence is low)
+    while (S.plumes.length < P.plumes) S.plumes.push({ x: rand() * W, y: rand() * H });
+    if (S.plumes.length > P.plumes) S.plumes.length = P.plumes;
+    const jit = (1 - P.coherence) * 1.6;
+    for (const p of S.plumes) {
+      const pc = idx(Math.floor(p.x), Math.floor(p.y));
+      p.x += UX[pc] + (rand() - 0.5) * 2 * jit; p.y += UY[pc] + (rand() - 0.5) * 2 * jit;
+      if (rand() < (1 - P.coherence) * 0.03) { p.x = rand() * W; p.y = rand() * H; }
+      p.x = ((p.x % W) + W) % W; p.y = ((p.y % H) + H) % H;
+      deposit(S, p.x, p.y, P.plumeRadius, P.plumeStrength);
+    }
+
+    // secret order: a cue appears at a hidden site, then a bloom follows cueLead ticks later
+    const cue = S.cue;
+    for (let i = 0; i < N; i++) cue[i] *= 0.9;
+    if (P.hidden) {
+      const lead = Math.min(P.cueLead, P.period - 1);
+      for (let s = 0; s < Math.min(P.sites, S.sites.length); s++) {
+        const site = S.sites[s];
+        const ph = (S.t + site.phase) % P.period;
+        if (ph === P.period - lead) {
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) cue[idx(site.x + dx, site.y + dy)] = 1;
+        }
+        if (ph === 0) deposit(S, site.x, site.y, 1.8, P.bloom);
+      }
+    }
+
+    // transport: finite-volume advection + diffusion, blocked by walls
+    Rn.set(R);
+    const D = P.diffusion;
+    for (let y = 0; y < H; y++) {
+      const yo = y * W, yd = ((y + 1) % H) * W;
+      for (let x = 0; x < W; x++) {
+        const i = yo + x, j = yo + ((x + 1) % W), k = yd + x;
+        const pi = 1 - Math.min(1, wall[i]);
+        if (pi <= 0) continue;
+        let pf = pi * (1 - Math.min(1, wall[j]));
+        if (pf > 0) { const u = (UX[i] + UX[j]) * 0.5; const F = pf * (D * (R[i] - R[j]) + (u > 0 ? u * R[i] : u * R[j])); Rn[i] -= F; Rn[j] += F; }
+        pf = pi * (1 - Math.min(1, wall[k]));
+        if (pf > 0) { const v = (UY[i] + UY[k]) * 0.5; const F = pf * (D * (R[i] - R[k]) + (v > 0 ? v * R[i] : v * R[k])); Rn[i] -= F; Rn[k] += F; }
+      }
+    }
+    const dec = P.decay, sh = P.shelter, shel = S.shel, wdec = P.wallDecay;
+    for (let i = 0; i < N; i++) {
+      const v = Rn[i] * (1 - dec * (1 - sh * shel[i])); R[i] = v > 0 ? v : 0;
+      if (wall[i] > 0) wall[i] = Math.max(0, wall[i] - wdec);
+    }
+  }
+
+  function bilinear(R, x, y) {
+    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+    return R[idx(x0, y0)] * (1 - fx) * (1 - fy) + R[idx(x0 + 1, y0)] * fx * (1 - fy) +
+      R[idx(x0, y0 + 1)] * (1 - fx) * fy + R[idx(x0 + 1, y0 + 1)] * fx * fy;
+  }
+
+  // Seam prior: assume the froth moves as coherent chunks, estimate that motion (Lucas-Kanade optical flow),
+  // and learn what fresh cues predict at their location after a given lag.
+  function observe(S, a) {
+    const P = S.P, R = S.R, Rp = S.Rp, r = P.senseR;
+    let sxx = 0, sxy = 0, syy = 0, sxt = 0, syt = 0, sum = 0, cnt = 0;
+    for (let dy = -r + 1; dy < r; dy++) for (let dx = -r + 1; dx < r; dx++) {
+      const x = a.x + dx, y = a.y + dy;
+      const Ix = (Rp[idx(x + 1, y)] - Rp[idx(x - 1, y)] + R[idx(x + 1, y)] - R[idx(x - 1, y)]) * 0.25;
+      const Iy = (Rp[idx(x, y + 1)] - Rp[idx(x, y - 1)] + R[idx(x, y + 1)] - R[idx(x, y - 1)]) * 0.25;
+      const c = idx(x, y), It = R[c] - Rp[c];
+      sxx += Ix * Ix; sxy += Ix * Iy; syy += Iy * Iy; sxt += Ix * It; syt += Iy * It;
+      sum += R[c]; cnt++;
+    }
+    // accumulate evidence over time (a slowly forgetting memory of motion), then solve
+    const M = a.m, k = 0.93;
+    M[0] = M[0] * k + sxx; M[1] = M[1] * k + sxy; M[2] = M[2] * k + syy; M[3] = M[3] * k + sxt; M[4] = M[4] * k + syt;
+    const det = M[0] * M[2] - M[1] * M[1];
+    if (det > 1e-7 && M[0] + M[2] > 1e-3) {
+      let vx = (-M[2] * M[3] + M[1] * M[4]) / det, vy = (M[1] * M[3] - M[0] * M[4]) / det;
+      const m = Math.hypot(vx, vy); if (m > 1.2) { vx *= 1.2 / m; vy *= 1.2 / m; }
+      a.vx += 0.15 * (vx - a.vx); a.vy += 0.15 * (vy - a.vy);
+    }
+    a.base += 0.02 * (sum / cnt - a.base);
+
+    // cue memory and lag learning
+    const cue = S.cue, cs = P.cueSight;
+    for (let dy = -cs; dy <= cs; dy++) for (let dx = -cs; dx <= cs; dx++) {
+      const c = idx(a.x + dx, a.y + dy);
+      if (cue[c] > 0.95) {
+        const x = wrapX(a.x + dx), y = wrapY(a.y + dy);
+        let dup = false;
+        for (const m of a.mem) if (Math.abs(wd(m.x - x, W)) <= 2 && Math.abs(wd(m.y - y, H)) <= 2 && S.t - m.t < 6) { dup = true; break; }
+        if (!dup) a.mem.push({ x, y, t: S.t });
+      }
+    }
+    a.mem = a.mem.filter((m) => S.t - m.t < L);
+    if (a.mem.length > 10) a.mem.splice(0, a.mem.length - 10);
+    for (const m of a.mem) {
+      if (Math.abs(wd(m.x - a.x, W)) <= r && Math.abs(wd(m.y - a.y, H)) <= r) {
+        const age = S.t - m.t;
+        const obs = R[idx(m.x, m.y)] - a.base;
+        a.w[age] += 0.1 * (obs - a.w[age]);
+        if (a.n[age] < 60000) a.n[age]++;
+      }
+    }
+  }
+
+  // Planning: score each cell it could head for, using its model of the froth (food, rivals, flow, cues).
+  function planModeler(S, a) {
+    const P = S.P, R = S.R, r = P.senseR, occ = S.occ, self = a.y * W + a.x;
+    let best = -1e9, tx = 0, ty = 0, seen = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const d = Math.max(Math.abs(dx), Math.abs(dy));
+      const c = idx(a.x + dx, a.y + dy);
+      let val = R[c];
+      if (val > seen) seen = val;
+      if (P.predict && d > 0) { // ambush: where the flow will carry food by the time I arrive
+        const sx = dx - a.vx * d, sy = dy - a.vy * d;
+        val = Math.abs(sx) <= r && Math.abs(sy) <= r ? bilinear(R, a.x + sx, a.y + sy) : 0;
+      }
+      // rivals are part of the froth: food next to other agents is likely to be eaten first
+      if (P.rivals && d > 0) val /= 1 + occ[c] - (c === self ? 1 : 0);
+      const sc = val - 0.03 * d;
+      if (sc > best) { best = sc; tx = dx; ty = dy; }
+    }
+    for (const m of a.mem) {
+      const dx = wd(m.x - a.x, W), dy = wd(m.y - a.y, H);
+      const d = Math.max(Math.abs(dx), Math.abs(dy));
+      const arr = S.t - m.t + d;
+      if (arr >= L) continue;
+      let val = -1e9;
+      for (let k = arr; k < Math.min(L, arr + 10); k++) val = Math.max(val, a.w[k] - 0.02 * (k - arr));
+      val += P.curiosity / (1 + a.n[Math.min(L - 1, arr)]);
+      const sc = val - 0.03 * d;
+      if (sc > best) { best = sc; tx = dx; ty = dy; }
+    }
+    // nothing worth having in view: the flow model says food comes from upstream
+    if (seen < 0.01 && best <= 0.01 && Math.hypot(a.vx, a.vy) > 0.08) {
+      const m = Math.hypot(a.vx, a.vy);
+      return [Math.round(-a.vx / m), Math.round(-a.vy / m)];
+    }
+    return [Math.sign(tx), Math.sign(ty)];
+  }
+
+  function planChaser(S, a) {
+    const R = S.R, r = S.P.senseR;
+    let best = -1e9, tx = 0, ty = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const d = Math.max(Math.abs(dx), Math.abs(dy));
+      const sc = R[idx(a.x + dx, a.y + dy)] - 0.03 * d;
+      if (sc > best) { best = sc; tx = dx; ty = dy; }
+    }
+    return [Math.sign(tx), Math.sign(ty)];
+  }
+
+  function buildHome(S, a) {
+    const P = S.P, wall = S.wall, rr = P.ringR;
+    const sp = Math.hypot(a.vx, a.vy);
+    const ex = a.vx / sp, ey = a.vy / sp; // downstream direction
+    const cells = [];
+    for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== rr) continue;
+      const m = Math.hypot(dx, dy);
+      if (-(dx * ex + dy * ey) / m > 0.55) continue; // leave the upstream side open
+      cells.push(idx(a.x + dx, a.y + dy));
+    }
+    let cost = 0;
+    for (const c of cells) { cost += P.wallCost * (1 - Math.min(1, wall[c])); wall[c] = 1; }
+    a.e -= cost;
+    a.home = { x: a.x, y: a.y, ex, ey, cells };
+    a.lowTicks = 0;
+  }
+
+  function planBuilder(S, a) {
+    const P = S.P, wall = S.wall, rr = P.ringR;
+    if (a.home) {
+      const h = a.home, sp = Math.hypot(a.vx, a.vy);
+      if (sp > 0.1 && (a.vx * h.ex + a.vy * h.ey) / sp < 0.5) a.home = null; // flow has turned: abandon
+      else {
+        if (a.intake < (P.baseCost + P.brain[3] * P.thinkCost)) a.lowTicks++; else a.lowTicks = Math.max(0, a.lowTicks - 2);
+        if (a.lowTicks > 150) a.home = null;
+      }
+    }
+    if (a.home) {
+      const h = a.home;
+      for (const c of h.cells) if (wall[c] < 0.4 && a.e > 1.5) { a.e -= P.wallCost * (1 - wall[c]); wall[c] = 1; }
+      // forage inside the enclosure
+      const R = S.R;
+      let best = -1e9, tx = 0, ty = 0;
+      for (let dy = -rr + 1; dy < rr; dy++) for (let dx = -rr + 1; dx < rr; dx++) {
+        const ox = wd(h.x + dx - a.x, W), oy = wd(h.y + dy - a.y, H);
+        const d = Math.max(Math.abs(ox), Math.abs(oy));
+        const sc = R[idx(h.x + dx, h.y + dy)] - 0.03 * d;
+        if (sc > best) { best = sc; tx = ox; ty = oy; }
+      }
+      return [Math.sign(tx), Math.sign(ty)];
+    }
+    // no home: consider building here
+    const sp = Math.hypot(a.vx, a.vy);
+    if (sp > 0.1 && a.e > P.reproAt * 0.6) {
+      let clear = true;
+      for (let dy = -rr - 1; dy <= rr + 1 && clear; dy++) for (let dx = -rr - 1; dx <= rr + 1; dx++) if (wall[idx(a.x + dx, a.y + dy)] > 0.3) { clear = false; break; }
+      if (clear) { buildHome(S, a); return [0, 0]; }
+    }
+    return planModeler(S, a);
+  }
+
+  // walls are membranes: agents cannot cross them; try sliding along one axis
+  function blockWalls(S, a, mv) {
+    if ((mv[0] || mv[1]) && S.wall[idx(a.x + mv[0], a.y + mv[1])] > 0.5) {
+      if (mv[0] && S.wall[idx(a.x + mv[0], a.y)] <= 0.5) return [mv[0], 0];
+      if (mv[1] && S.wall[idx(a.x, a.y + mv[1])] <= 0.5) return [0, mv[1]];
+      return [0, 0];
+    }
+    return mv;
+  }
+  // Chaser energy drain: resting metabolism shrinks toward 40% when still; each step costs more the faster they go.
+  function chaserCost(P, steps) {
+    const sp = P.chaserSpeed;
+    return P.baseCost * (0.4 + 0.6 * Math.min(1, sp)) + P.moveCost * steps * Math.max(1, sp) + P.brain[1] * P.thinkCost;
+  }
+
+  function stepAgents(S) {
+    const P = S.P, R = S.R, rand = S.rand, ag = S.agents;
+    for (let i = ag.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const t = ag[i]; ag[i] = ag[j]; ag[j] = t; }
+    const born = [], occ = S.occ;
+    occ.fill(0);
+    for (const a of ag) if (occ[a.y * W + a.x] < 250) occ[a.y * W + a.x]++;
+    for (const a of ag) {
+      let mv, steps = 0;
+      if (a.type === 1) {
+        // chasers have a pace: several steps per tick (costly), or none at all (sit and wait, cheap)
+        const sp = P.chaserSpeed;
+        let n = Math.floor(sp); if (rand() < sp - n) n++;
+        for (let k = 0; k < n; k++) {
+          const m = blockWalls(S, a, planChaser(S, a));
+          if (!m[0] && !m[1]) break;
+          a.x = wrapX(a.x + m[0]); a.y = wrapY(a.y + m[1]); steps++;
+        }
+      } else {
+        if (a.type === 0) {
+          if (rand() < 0.25) { a.hx = Math.floor(rand() * 3) - 1; a.hy = Math.floor(rand() * 3) - 1; }
+          mv = [a.hx, a.hy];
+        } else { observe(S, a); mv = a.type === 2 ? planModeler(S, a) : planBuilder(S, a); }
+        mv = blockWalls(S, a, mv);
+        if (mv[0] || mv[1]) { a.x = wrapX(a.x + mv[0]); a.y = wrapY(a.y + mv[1]); steps = 1; }
+      }
+      const c = a.y * W + a.x;
+      const take = Math.min(R[c], P.eatRate);
+      R[c] -= take; a.e += take;
+      a.intake += 0.03 * (take - a.intake);
+      if (a.type === 1) a.e -= chaserCost(P, steps);
+      else a.e -= P.baseCost + (steps ? P.moveCost : 0) + P.brain[a.type] * P.thinkCost;
+      a.age++;
+      if (a.e <= 0) { a.dead = true; S.deaths[a.type]++; }
+      else if (a.e > P.reproAt && ag.length + born.length < P.maxPop) {
+        a.e /= 2;
+        let cx = a.x + Math.floor(rand() * 3) - 1, cy = a.y + Math.floor(rand() * 3) - 1;
+        if (a.home) { // a settled builder's offspring disperse to found homes of their own
+          const ang = rand() * Math.PI * 2, dist = P.ringR * 2 + 2 + rand() * 6;
+          cx = Math.round(a.x + Math.cos(ang) * dist); cy = Math.round(a.y + Math.sin(ang) * dist);
+        }
+        const ch = newAgent(S, a.type, wrapX(cx), wrapY(cy), a.e, a);
+        born.push(ch); S.births[a.type]++;
+      }
+    }
+    S.agents = ag.filter((a) => !a.dead).concat(born);
+    // shelter: inside a living builder's enclosure, stored resource decays more slowly
+    const shel = S.shel; shel.fill(0);
+    const rr = P.ringR;
+    for (const a of S.agents) if (a.home) {
+      const h = a.home;
+      for (let dy = -rr + 1; dy < rr; dy++) for (let dx = -rr + 1; dx < rr; dx++) shel[idx(h.x + dx, h.y + dy)] = 1;
+    }
+  }
+
+  function order(S) {
+    const R = S.R; let tot = 0;
+    for (let i = 0; i < N; i++) tot += R[i];
+    if (tot <= 0) return 0;
+    let h = 0;
+    for (let i = 0; i < N; i++) { const p = R[i] / tot; if (p > 0) h -= p * Math.log(p); }
+    return 1 - h / Math.log(N);
+  }
+
+  function snapshot(S) {
+    const pop = [0, 0, 0, 0], intake = [0, 0, 0, 0];
+    let fe = 0, fn = 0;
+    for (const a of S.agents) {
+      pop[a.type]++; intake[a.type] += a.intake;
+      if (a.type >= 2) { const c = a.y * W + a.x; fe += Math.hypot(a.vx - S.UX[c], a.vy - S.UY[c]); fn++; }
+    }
+    for (let k = 0; k < 4; k++) intake[k] = pop[k] ? intake[k] / pop[k] : 0;
+    return { pop, intake, flowErr: fn ? fe / fn : NaN, flowSpeed: Math.hypot(S.ux, S.uy) };
+  }
+
+  function record(S) {
+    const s = snapshot(S), h = S.hist;
+    h.t.push(S.t);
+    for (let k = 0; k < 4; k++) { h.pop[k].push(s.pop[k]); h.intake[k].push(s.intake[k]); }
+    h.order.push(order(S)); h.flowErr.push(s.flowErr);
+    if (h.t.length > 800) { // thin old history
+      const thin = (arr) => arr.filter((_, i) => i % 2 === 0 || i > arr.length - 200);
+      h.t = thin(h.t); h.order = thin(h.order); h.flowErr = thin(h.flowErr);
+      for (let k = 0; k < 4; k++) { h.pop[k] = thin(h.pop[k]); h.intake[k] = thin(h.intake[k]); }
+    }
+  }
+
+  // Average learned lag curve across thinking agents (what they believe a cue predicts)
+  function lagBelief(S) {
+    const w = new Float64Array(L), n = new Float64Array(L);
+    let agents = 0;
+    for (const a of S.agents) if (a.type >= 2) {
+      agents++;
+      for (let k = 0; k < L; k++) if (a.n[k] > 0) { w[k] += a.w[k]; n[k]++; }
+    }
+    const out = [];
+    for (let k = 0; k < L; k++) out.push(n[k] ? w[k] / n[k] : 0);
+    return { curve: out, agents };
+  }
+
+  function step(S) {
+    stepField(S);
+    stepAgents(S);
+    S.t++;
+    if (S.t % 5 === 0) record(S);
+  }
+
+  root.Froth = { W, H, N, L, chaserCost, defaultParams, createSim, step, snapshot, lagBelief, order, idx };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const F = window.Froth;
+  const TYPES = [
+    { name: 'Drifters', tag: 'Scale 1 · random, keep what they bump into' },
+    { name: 'Chasers', tag: 'Baseline · stimulus → response' },
+    { name: 'Modelers', tag: 'Scale 2 · seam prior, causal model' },
+    { name: 'Builders', tag: 'Scale 3 · model, and build seams' },
+  ];
+  let P = F.defaultParams();
+  let S, running = true, frame = 0;
+  const $ = (id) => document.getElementById(id);
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  // ---------- controls ----------
+  const live = ['chaserSpeed', 'thinkCost', 'driftSpeed', 'driftTurn', 'coherence', 'plumes', 'decay', 'wallCost', 'wallDecay', 'shelter', 'cueLead', 'period', 'bloom'];
+  const fmt = { chaserSpeed: (v) => (v === 0 ? 'still' : v.toFixed(2) + '/t'), driftTurn: (v) => v.toFixed(4), wallDecay: (v) => v.toFixed(4), decay: (v) => v.toFixed(3), wallCost: (v) => v.toFixed(3), plumes: (v) => v.toFixed(0), cueLead: (v) => v.toFixed(0), period: (v) => v.toFixed(0) };
+  const agentsCtl = $('agentsCtl');
+  TYPES.forEach((t, k) => {
+    const row = document.createElement('div');
+    row.className = 'agentrow';
+    row.innerHTML = `<span class="sw" style="background:var(--c${k})"></span><label class="chk" for="en${k}"><input type="checkbox" id="en${k}"> ${t.name}</label><input type="number" id="n${k}" min="0" max="150" aria-label="${t.name} at start">`;
+    agentsCtl.appendChild(row);
+  });
+  function syncControls() {
+    for (const id of live) { const el = $(id); el.value = P[id]; $(id + '_o').textContent = (fmt[id] || ((v) => v.toFixed(2)))(+P[id]); }
+    $('hidden').checked = P.hidden; $('inherit').checked = P.inherit;
+    paceHint();
+    for (let k = 0; k < 4; k++) { $('en' + k).checked = P.enabled[k]; $('n' + k).value = P.start[k]; }
+  }
+  for (const id of live) $(id).addEventListener('input', (e) => {
+    P[id] = +e.target.value; $(id + '_o').textContent = (fmt[id] || ((v) => v.toFixed(2)))(P[id]);
+    if (S) S.P[id] = P[id];
+    paceHint();
+  });
+  function paceHint() {
+    const sp = P.chaserSpeed, moving = F.chaserCost(P, sp), still = F.chaserCost(P, 0);
+    const other = P.baseCost + P.moveCost;
+    $('paceHint').textContent = sp === 0
+      ? `Rooted in place. Drain ${still.toFixed(3)}/tick (a drifter on the move: ${other.toFixed(3)}).`
+      : `Drain ${still.toFixed(3)}/tick resting, ${moving.toFixed(3)}/tick at full pace (a drifter on the move: ${other.toFixed(3)}).`;
+  }
+  $('hidden').addEventListener('change', (e) => { P.hidden = e.target.checked; if (S) S.P.hidden = P.hidden; });
+  $('inherit').addEventListener('change', (e) => { P.inherit = e.target.checked; if (S) S.P.inherit = P.inherit; });
+  for (let k = 0; k < 4; k++) {
+    $('en' + k).addEventListener('change', (e) => { P.enabled[k] = e.target.checked; });
+    $('n' + k).addEventListener('change', (e) => { P.start[k] = Math.max(0, Math.min(150, +e.target.value || 0)); });
+  }
+  const PRESETS = {
+    default: {},
+    costly: { thinkCost: 3 },
+    sitters: { chaserSpeed: 0 },
+    sprinters: { chaserSpeed: 2.5 },
+    turbulent: { coherence: 0.15 },
+    slow: { driftSpeed: 0.08, driftTurn: 0.0005 },
+    secret: { hidden: true },
+    nobuild: { hidden: true, enabled: [true, true, true, false] },
+  };
+  document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
+    P = Object.assign(F.defaultParams(), JSON.parse(JSON.stringify(PRESETS[b.dataset.preset])));
+    syncControls(); reset();
+  }));
+
+  function reset() {
+    S = F.createSim(JSON.parse(JSON.stringify(P)), +$('seed').value || 1);
+    draw(); drawCharts(); updateScore();
+  }
+  $('reset').addEventListener('click', reset);
+  $('run').addEventListener('click', () => { running = !running; $('run').textContent = running ? 'Pause' : 'Run'; });
+  $('step').addEventListener('click', () => { running = false; $('run').textContent = 'Run'; F.step(S); draw(); drawCharts(); updateScore(); });
+
+  // ---------- world rendering ----------
+  const wc = $('world'), wctx = wc.getContext('2d');
+  const off = document.createElement('canvas'); off.width = F.W; off.height = F.H;
+  const octx = off.getContext('2d'), img = octx.createImageData(F.W, F.H);
+  const RAMP = [[11, 15, 20], [20, 38, 42], [36, 82, 72], [78, 140, 90], [160, 205, 120], [236, 245, 190]];
+  const lut = new Uint8Array(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255 * (RAMP.length - 1), k = Math.min(RAMP.length - 2, Math.floor(t)), f = t - k;
+    for (let c = 0; c < 3; c++) lut[i * 3 + c] = RAMP[k][c] + (RAMP[k + 1][c] - RAMP[k][c]) * f;
+  }
+  const AG = [[175, 184, 196], [242, 154, 69], [90, 163, 240], [236, 99, 149]];
+  function draw() {
+    const R = S.R, wall = S.wall, d = img.data;
+    for (let i = 0; i < F.N; i++) {
+      const v = Math.min(255, Math.floor((1 - Math.exp(-R[i] * 5)) * 255));
+      let r = lut[v * 3], g = lut[v * 3 + 1], b = lut[v * 3 + 2];
+      const w = Math.min(1, wall[i]);
+      if (w > 0) { r += (239 - r) * w; g += (230 - g) * w; b += (220 - b) * w; }
+      d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = 255;
+    }
+    octx.putImageData(img, 0, 0);
+    const sc = wc.width / F.W;
+    wctx.imageSmoothingEnabled = false;
+    wctx.drawImage(off, 0, 0, wc.width, wc.height);
+    // true flow
+    if ($('showFlow').checked) {
+      wctx.strokeStyle = 'rgba(255,255,255,0.28)'; wctx.lineWidth = 1.2;
+      for (let gy = 6; gy < F.H; gy += 12) for (let gx = 6; gx < F.W; gx += 12) {
+        const c = gy * F.W + gx, ux = S.UX[c], uy = S.UY[c];
+        const x = (gx + 0.5) * sc, y = (gy + 0.5) * sc, L = 22;
+        const ex = x + ux * L * 2.2, ey = y + uy * L * 2.2;
+        wctx.beginPath(); wctx.moveTo(x, y); wctx.lineTo(ex, ey);
+        const a = Math.atan2(ey - y, ex - x);
+        wctx.lineTo(ex - 5 * Math.cos(a - 0.5), ey - 5 * Math.sin(a - 0.5));
+        wctx.moveTo(ex, ey); wctx.lineTo(ex - 5 * Math.cos(a + 0.5), ey - 5 * Math.sin(a + 0.5));
+        wctx.stroke();
+      }
+    }
+    // cues
+    const cue = S.cue;
+    wctx.strokeStyle = 'rgba(111,227,255,0.9)'; wctx.lineWidth = 2;
+    for (let i = 0; i < F.N; i++) if (cue[i] > 0.3) {
+      const x = i % F.W, y = (i / F.W) | 0;
+      if (cue[(i + 1) % F.N] > 0.3 && cue[(i + F.N - 1) % F.N] > 0.3 && cue[(i + F.W) % F.N] > 0.3) {
+        wctx.globalAlpha = cue[i]; wctx.beginPath(); wctx.arc((x + 0.5) * sc, (y + 0.5) * sc, sc * 3.2, 0, Math.PI * 2); wctx.stroke();
+      }
+    }
+    wctx.globalAlpha = 1;
+    if ($('reveal').checked && S.P.hidden) {
+      wctx.setLineDash([4, 4]); wctx.strokeStyle = 'rgba(255,255,255,0.85)'; wctx.lineWidth = 1.5;
+      for (let s = 0; s < Math.min(S.P.sites, S.sites.length); s++) { const st = S.sites[s]; wctx.beginPath(); wctx.arc((st.x + 0.5) * sc, (st.y + 0.5) * sc, sc * 4.5, 0, Math.PI * 2); wctx.stroke(); }
+      wctx.setLineDash([]);
+    }
+    // agents
+    for (const a of S.agents) {
+      const c = AG[a.type];
+      wctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      wctx.beginPath(); wctx.arc((a.x + 0.5) * sc, (a.y + 0.5) * sc, a.home ? sc * 0.55 : sc * 0.42, 0, Math.PI * 2); wctx.fill();
+    }
+    $('tick').textContent = 't = ' + S.t.toLocaleString();
+  }
+
+  // ---------- scoreboard ----------
+  const score = $('score');
+  score.innerHTML = '<div class="row head"><span></span><span>Kind</span><span class="num">Alive</span><span class="num">Intake</span><span class="num">Trend</span></div>' +
+    TYPES.map((t, k) => `<div class="row"><span class="sw" style="background:var(--c${k})"></span><span class="nm"><b>${t.name}</b><span>${t.tag}</span></span><span class="num mono" id="p${k}">0</span><span class="num mono" id="i${k}">0</span><span class="pill off" id="s${k}">off</span></div>`).join('');
+  function updateScore() {
+    const s = F.snapshot(S), h = S.hist, n = h.t.length;
+    for (let k = 0; k < 4; k++) {
+      $('p' + k).textContent = s.pop[k];
+      $('i' + k).textContent = s.pop[k] ? s.intake[k].toFixed(3) : '–';
+      const el = $('s' + k);
+      const past = h.pop[k][Math.max(0, n - 40)] || 0;
+      let cls = 'off', txt = 'not present';
+      if (!S.P.enabled[k] && !s.pop[k]) { cls = 'off'; txt = 'not present'; }
+      else if (s.pop[k] === 0) { cls = 'bad'; txt = 'extinct'; }
+      else if (s.pop[k] > past * 1.1 + 2) { cls = 'good'; txt = 'growing'; }
+      else if (s.pop[k] < past * 0.85 - 2) { cls = 'warn'; txt = 'declining'; }
+      else { cls = 'good'; txt = 'holding'; }
+      el.className = 'pill ' + cls; el.textContent = txt;
+    }
+  }
+
+  // ---------- charts ----------
+  function prep(cv) {
+    const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function nice(m) { if (m <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(m))), f = m / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; }
+  function frameAxes(ctx, w, h, ymax, fmtY) {
+    const pl = 38, pr = 6, pt = 6, pb = 16;
+    ctx.font = '10px "IBM Plex Mono", monospace'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+    for (let i = 0; i <= 2; i++) {
+      const y = pt + (h - pt - pb) * (1 - i / 2);
+      ctx.beginPath(); ctx.moveTo(pl, y + 0.5); ctx.lineTo(w - pr, y + 0.5); ctx.stroke();
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(fmtY(ymax * i / 2), pl - 5, y);
+    }
+    return { pl, pr, pt, pb, X: (f) => pl + f * (w - pl - pr), Y: (v) => pt + (h - pt - pb) * (1 - v / ymax) };
+  }
+  function lines(cv, series, opts) {
+    const { ctx, w, h } = prep(cv);
+    const n = S.hist.t.length;
+    let m = opts.min || 0;
+    for (const s of series) for (const v of s.data) if (isFinite(v) && v > m) m = v;
+    const ymax = opts.ymax || nice(m * 1.05);
+    const A = frameAxes(ctx, w, h, ymax, opts.fmt || ((v) => v.toFixed(0)));
+    ctx.fillStyle = css('--muted'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText('t ' + (S.hist.t[0] || 0), A.pl, h); ctx.textAlign = 'right'; ctx.fillText('t ' + (S.hist.t[n - 1] || 0), w - A.pr, h);
+    if (opts.ref != null) { ctx.setLineDash([3, 3]); ctx.strokeStyle = css('--muted'); ctx.beginPath(); ctx.moveTo(A.pl, A.Y(opts.ref)); ctx.lineTo(w - A.pr, A.Y(opts.ref)); ctx.stroke(); ctx.setLineDash([]); }
+    for (const s of series) {
+      ctx.strokeStyle = s.color; ctx.lineWidth = 1.8; ctx.beginPath(); let on = false;
+      s.data.forEach((v, i) => { if (!isFinite(v)) { on = false; return; } const x = A.X(n > 1 ? i / (n - 1) : 0), y = A.Y(Math.min(v, ymax)); on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+      ctx.stroke();
+      const last = s.data[n - 1];
+      if (isFinite(last)) { ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(A.X(1), A.Y(Math.min(last, ymax)), 2.6, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+  function drawCharts() {
+    const h = S.hist, cols = [0, 1, 2, 3].map((k) => css('--c' + k));
+    const act = [0, 1, 2, 3].filter((k) => S.P.enabled[k] || h.pop[k].some((v) => v > 0));
+    lines($('chPop'), act.map((k) => ({ data: h.pop[k], color: cols[k] })), {});
+    lines($('chInt'), act.map((k) => ({ data: h.intake[k].map((v, i) => (h.pop[k][i] ? v : NaN)), color: cols[k] })), { fmt: (v) => v.toFixed(3), ref: S.P.baseCost, min: S.P.baseCost * 2 });
+    lines($('chFlow'), [{ data: h.flowErr, color: css('--accent') }], { fmt: (v) => v.toFixed(2), ymax: 0.6 });
+    const s = F.snapshot(S);
+    $('flowCap').textContent = isFinite(s.flowErr) ? `Mean error ${s.flowErr.toFixed(2)} cells/tick against a true speed of ${s.flowSpeed.toFixed(2)}.` : 'No modelers or builders alive to hold a flow model.';
+    // lag belief
+    const { ctx, w, h: ch } = prep($('chLag'));
+    const lb = F.lagBelief(S), cv = lb.curve;
+    let m = 0.2; for (const v of cv) m = Math.max(m, Math.abs(v));
+    const ymax = nice(m * 1.05);
+    const A = frameAxes(ctx, w, ch, ymax, (v) => v.toFixed(1));
+    const bw = (w - A.pl - A.pr) / F.L;
+    ctx.fillStyle = css('--c2');
+    cv.forEach((v, i) => { if (v > 0) { const y = A.Y(Math.min(v, ymax)); ctx.fillRect(A.pl + i * bw + 0.5, y, Math.max(1, bw - 1), A.Y(0) - y); } });
+    ctx.fillStyle = css('--muted'); ctx.textBaseline = 'bottom'; ctx.textAlign = 'left'; ctx.fillText('0', A.pl, ch); ctx.textAlign = 'right'; ctx.fillText((F.L - 1) + ' ticks', w - A.pr, ch);
+    if (S.P.hidden) {
+      const x = A.pl + (Math.min(S.P.cueLead, F.L - 1) + 0.5) * bw;
+      ctx.strokeStyle = css('--c1'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, A.pt); ctx.lineTo(x, A.Y(0)); ctx.stroke();
+    }
+    let bi = 0; cv.forEach((v, i) => { if (v > cv[bi]) bi = i; });
+    $('lagCap').textContent = !lb.agents ? 'No thinkers alive to hold a belief.' : !S.P.hidden ? 'Secret order is off, so there is nothing to learn yet.' :
+      (cv[bi] > 0.05 ? `Their belief peaks ${bi} ticks after a cue. The true lag (orange) is ${S.P.cueLead}.` : 'Thinkers have not yet linked cues to blooms.');
+  }
+
+  // ---------- loop ----------
+  function loop() {
+    if (running) {
+      const n = +$('speed').value;
+      for (let i = 0; i < n; i++) F.step(S);
+      draw();
+      if (++frame % 6 === 0) { drawCharts(); updateScore(); }
+    }
+    requestAnimationFrame(loop);
+  }
+  window.addEventListener('resize', () => drawCharts());
+  syncControls(); reset();
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { running = false; $('run').textContent = 'Run'; }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
