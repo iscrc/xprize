@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conclave Opinion Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a lab notebook for a thought experiment: calm, exact, a little playful
+   IDEA: a fisheries survey chart of a bay; every cell is a voter in the conclave
+   PICTURE: the live grid itself, large, on a deep-sea panel
+   COLOUR and TYPE: sea-teal panel, plain ground, five opinion pigments, burnt-orange accent; Archivo
+   LAYOUT: grid first, live readouts beside it (below on phones), controls, then the mapping to the text */
+:root{color-scheme:light dark;--bg:light-dark(#fbfbf9,#0b1211);--ink:light-dark(#10201f,#e7efed);--mute:light-dark(#566664,#97a9a6);--line:light-dark(#dde3e1,#24312f);--panel:light-dark(#ffffff,#121c1b);--sea:#0d2624;--acc:light-dark(#c2410c,#ff8a50)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3vw,40px) max(4vw,14px);max-width:1240px;margin:0 auto}
+h1{font-size:clamp(30px,4.4vw,46px);line-height:1.05;margin:0 0 8px;font-weight:800;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:22px;margin:0 0 10px;font-weight:800}
+.lede{color:var(--mute);max-width:68ch;margin:0}
+.stage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:24px;align-items:start}
+.board{background:var(--sea);border-radius:14px;padding:10px;box-shadow:0 10px 30px -18px #0008}
+.board .sq{position:relative;aspect-ratio:1}
+.board canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:8px;touch-action:none}
+.info{color:#cfe1de;font-size:13px;padding:8px 4px 0;min-height:30px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button{font:600 15px Archivo,sans-serif;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.pre button{font-weight:500;font-size:14px}
+.pre button[aria-pressed=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.read{display:grid;gap:16px}
+.big{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.tile b{display:block;font-size:clamp(20px,2.6vw,28px);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;color:var(--mute)}
+.legend{display:grid;gap:6px}
+.lg{display:grid;grid-template-columns:16px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:14px}
+.lg i{width:16px;height:16px;border-radius:4px}
+.bar{height:6px;border-radius:3px;background:var(--line);grid-column:2/4;margin-top:-4px}
+.bar>div{height:100%;border-radius:3px}
+.lg em{font-style:normal;font-size:12px;font-weight:600;color:var(--acc);margin-left:6px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+.fig{position:relative;height:170px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.fig canvas{position:absolute;inset:0;width:100%;height:100%}
+.keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--mute);margin-top:6px}
+.keys i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+.rs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;font-size:14px}
+.rs div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:3px 0}
+.rs b{font-variant-numeric:tabular-nums}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px 28px;margin-top:14px}
+.ctl label{display:block;font-weight:600;font-size:15px}
+.ctl label output{float:right;font-weight:400;color:var(--mute);font-variant-numeric:tabular-nums}
+.ctl small{display:block;color:var(--mute);font-size:13px;line-height:1.35}
+input[type=range]{width:100%;height:32px;accent-color:var(--acc)}
+.tg{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:15px}
+.tg label{display:flex;align-items:center;gap:8px;min-height:44px}
+.tg input{width:20px;height:20px;accent-color:var(--acc)}
+.map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 28px}
+.map p{margin:0}.map q{font-weight:600;quotes:"“" "”"}
+.sym{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:14px;color:var(--mute);margin:6px 0 0}
+.sym svg{vertical-align:middle;margin-right:6px}
+@media(max-width:860px){.stage{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:520px){.big{grid-template-columns:repeat(2,minmax(0,1fr))}.rs{grid-template-columns:minmax(0,1fr)}}
+</style></head><body>
+<header class="band" style="padding-bottom:10px">
+<h1>Proof-of-stake opinions, with a residual stream for the odd ones out</h1>
+<p class="lede">A bay full of voters argues about why the fishery is collapsing. Credentialed members carry more stake, mostly listen to each other, and lag when the truth moves. Lone mavericks often see it first. Watch whether their view can leak through, get flagged, and survive scrutiny.</p>
+</header>
+<main class="band" style="padding-top:8px">
+<section class="stage">
+<div>
+<div class="board"><div class="sq" id="sq"><canvas id="cv" aria-label="Opinion grid"></canvas></div>
+<div class="info" id="info">Tap or hover a cell to inspect a voter.</div></div>
+<div class="sym">
+<span><svg width="14" height="14"><rect width="14" height="14" rx="2" fill="#7b8f8c"/></svg>Credentialed (square)</span>
+<span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#7b8f8c"/></svg>Crowd (dot)</span>
+<span><svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="none" stroke="#ffd60a" stroke-width="2.5"/></svg>Flagged, under scrutiny</span>
+<span><svg width="16" height="16"><circle cx="8" cy="8" r="5" fill="#7b8f8c" stroke="#fff" stroke-width="2"/></svg>Earned stake after passing</span>
+</div>
+<div class="btns">
+<button class="pri" id="play">Pause</button><button id="step">Step</button><button id="shift">Shift the truth now</button><button id="reset">Reset</button>
+</div>
+</div>
+<div class="read">
+<div class="big">
+<div class="tile"><b id="mAll">–</b><span>everyone right</span></div>
+<div class="tile"><b id="mCred">–</b><span>credentialed right</span></div>
+<div class="tile"><b id="mCrowd">–</b><span>crowd right</span></div>
+<div class="tile"><b id="mRec">–</b><span id="mRecL">recovery after shift</span></div>
+</div>
+<div><h2>What the bay believes</h2><div class="legend" id="legend"></div></div>
+<div><div class="fig"><canvas id="ch"></canvas></div>
+<div class="keys"><span><i style="background:var(--ink)"></i>everyone</span><span><i style="background:var(--acc)"></i>credentialed</span><span><i style="background:#8aa19d"></i>crowd</span><span><i style="background:repeating-linear-gradient(90deg,var(--mute) 0 3px,transparent 3px 6px)"></i>truth shifted</span></div></div>
+<div><h2>Residual stream</h2><div class="rs">
+<div><span>Flagged right now</span><b id="rNow">0</b></div>
+<div><span>Leaked in total</span><b id="rTot">0</b></div>
+<div><span>True insight, accepted</span><b id="rTA">0</b></div>
+<div><span>Hallucination, caught</span><b id="rFR">0</b></div>
+<div><span>True insight, wrongly binned</span><b id="rTR">0</b></div>
+<div><span>Hallucination, let through</span><b id="rFA">0</b></div>
+</div></div>
+</div>
+</section>
+
+<section style="margin-top:28px">
+<h2>Try a regime</h2>
+<div class="btns pre" id="presets"></div>
+<div class="ctl" id="ctl"></div>
+<div class="tg">
+<label><input type="checkbox" id="auto" checked>Truth shifts on its own</label>
+<label><input type="checkbox" id="showMav">Reveal hidden mavericks</label>
+</div>
+</section>
+
+<section style="margin-top:32px;border-top:1px solid var(--line);padding-top:24px">
+<h2>How the text maps onto the model</h2>
+<div class="map">
+<p><q>Competence coefficient</q> Every voter has a credential score. When a voter updates, each neighbour's opinion counts with weight (0.05 + credential + earned stake) raised to the <b>competence weighting</b> power. At 0 it is one person, one vote; at 3 a PhD outweighs a crowd member about 40 to 1.</p>
+<p><q>The PhD vs the gut feeling</q> Each turn a voter may see private evidence. Credentialed voters read the truth well, but through the field's current paradigm. The crowd's evidence is barely better than chance. That is the econometrics versus the daytime TV.</p>
+<p><q>A layered topology</q> Credentialed voters get long-range links to each other. The <b>layered topology</b> slider strengthens those links and mutes what they hear from crowd neighbours, so expert opinion clumps into its own layer.</p>
+<p><q>Valuable yet unusual opinions</q> A few hidden mavericks have low credentials but sharp, current evidence. When the truth shifts (the fishery changes), the experts' paradigm lags with the <b>inertia</b> setting, and the mavericks are right first. With heavy stake weighting their neighbours drown them out.</p>
+<p><q>Treat them as hallucinations, let some leak</q> A crowd voter who dissents from the expert consensus and has evidence behind it may leak into the <b>residual stream</b>. It is flagged in yellow, gets a hearing inside the expert layer, and after 20 ticks faces a test that is right with the <b>scrutiny accuracy</b> probability.</p>
+<p><q>Flagging for increased scrutiny</q> Passing earns the voter lasting stake, and a passed true insight also speeds up the experts' paradigm shift. Failing costs stake. Weak scrutiny lets hallucinations gain stake too, so watch the bottom-right counter.</p>
+</div>
+<p class="lede" style="margin-top:16px;font-size:14px">The five fishery explanations are illustrative labels. The model is a toy built to make the trade-offs visible, not a calibrated forecast.</p>
+</section>
+</main>
+<script>
+{
+// CORE START
+const N=48,K=5,NN=N*N;
+const P={alpha:3,layer:.9,leak:.06,scrut:.85,tau:300,period:900,cred:.2,mav:.03,speed:3,auto:true,showMav:false};
+let op,cred,cls,earned,flag,lastSig,heard,links,credList,flagged,T,Pv,pg,tick,shiftTick,hist,shifts,stats,recovering,lastRecov,consensus,frac;
+const v=new Float64Array(K);
+const rnd=n=>Math.floor(Math.random()*n);
+function init(){
+ op=new Uint8Array(NN);cred=new Float32Array(NN);cls=new Uint8Array(NN);earned=new Float32Array(NN);
+ flag=new Int16Array(NN);lastSig=new Int8Array(NN);heard=new Int8Array(NN).fill(-1);
+ credList=[];flagged=new Set();
+ for(let i=0;i<NN;i++){const r=Math.random();
+  if(r<P.cred){cls[i]=1;cred[i]=.65+.35*Math.random();credList.push(i)}
+  else if(r<P.cred+P.mav){cls[i]=2;cred[i]=.05+.15*Math.random()}
+  else{cls[i]=0;cred[i]=.05+.25*Math.random()}
+  op[i]=rnd(K)}
+ links=new Array(NN);
+ for(const i of credList){links[i]=[0,1,2,3].map(()=>credList[rnd(credList.length)])}
+ T=0;Pv=0;pg=1;tick=0;shiftTick=0;hist=[];shifts=[];recovering=false;lastRecov=null;consensus=0;
+ stats={tot:0,TA:0,FA:0,TR:0,FR:0};frac={all:0,cred:0,crowd:0,mav:0,counts:new Array(K).fill(0)};
+}
+const stake=j=>Math.pow(.05+cred[j]+earned[j],P.alpha);
+function update(i){
+ v.fill(0);const x=i%N,y=(i/N)|0,isC=cls[i]===1;
+ for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;
+  const j=((y+dy+N)%N)*N+(x+dx+N)%N;let w=stake(j);
+  if(isC&&cls[j]!==1&&flag[j]<=0)w*=1-P.layer;v[op[j]]+=w}
+ if(isC){for(const j of links[i])v[op[j]]+=stake(j)*P.layer*2;
+  if(heard[i]>=0){v[heard[i]]+=stake(i)*3;heard[i]=-1}}
+ const ws=stake(i);v[op[i]]+=ws;
+ let s=-1;
+ if(Math.random()<.35){let ev;
+  if(isC){s=Math.random()<.85?(Math.random()<pg?T:Pv):rnd(K);ev=4}
+  else if(cls[i]===2){s=Math.random()<.9?T:rnd(K);ev=10}
+  else{s=Math.random()<.3?T:rnd(K);ev=1.5}
+  v[s]+=ws*ev}
+ let tot=0;for(let k=0;k<K;k++){v[k]*=v[k];tot+=v[k]}
+ if(tot>0){let r=Math.random()*tot,best=K-1;for(let k=0;k<K;k++){r-=v[k];if(r<=0){best=k;break}}op[i]=best}
+ if(s>=0)lastSig[i]=s===op[i]?Math.min(9,lastSig[i]+1):0;
+ if(!isC&&flag[i]===0&&op[i]!==consensus&&lastSig[i]>=2&&Math.random()<P.leak*.15){
+  flag[i]=20;flagged.add(i);stats.tot++}
+}
+function shift(){Pv=T;do{T=rnd(K)}while(T===Pv);pg=0;shiftTick=tick;shifts.push(tick);recovering=true}
+function step(){
+ tick++;
+ const cc=new Array(K).fill(0);for(const i of credList)cc[op[i]]++;
+ consensus=cc.indexOf(Math.max(...cc));
+ pg+=(1-pg)/P.tau;
+ for(let u=0;u<NN/2;u++)update(rnd(NN));
+ for(const f of flagged){
+  if(credList.length){heard[credList[rnd(credList.length)]]=op[f];heard[credList[rnd(credList.length)]]=op[f]}
+  if(--flag[f]<=0){flag[f]=0;flagged.delete(f);
+   const ok=op[f]===T,pass=Math.random()<(ok?P.scrut:1-P.scrut);
+   if(pass){earned[f]=Math.min(1,earned[f]+.35);if(ok){stats.TA++;pg=Math.min(1,pg+.06)}else{stats.FA++;pg=Math.max(0,pg-.06)}}
+   else{earned[f]=Math.max(0,earned[f]-.1);if(ok)stats.TR++;else stats.FR++}}}
+ let a=0,c=0,nc=0,cw=0,ncw=0,m=0,nm=0;const counts=new Array(K).fill(0);
+ for(let i=0;i<NN;i++){const r=op[i]===T;counts[op[i]]++;a+=r;
+  if(cls[i]===1){nc++;c+=r}else{ncw++;cw+=r;if(cls[i]===2){nm++;m+=r}}}
+ frac={all:a/NN,cred:nc?c/nc:0,crowd:ncw?cw/ncw:0,mav:nm?m/nm:0,counts};
+ hist.push([frac.all,frac.cred,frac.crowd]);if(hist.length>600)hist.shift();
+ if(recovering&&frac.all>.5){lastRecov=tick-shiftTick;recovering=false}
+ if(P.auto&&tick-shiftTick>=P.period)shift();
+}
+// CORE END
+const COL=['#ef6a3a','#2bb3a0','#f0c34a','#9b7bd0','#4f8ef0'];
+const LAB=['Cheating boats','Warming water','Natural cycle','Foreign trawlers','Seal rebound'];
+const $=id=>document.getElementById(id);
+const SL=[
+ ['alpha','Competence weighting',0,4,.1,v=>v.toFixed(1),'Stake exponent. 0 is one person, one vote.'],
+ ['layer','Layered topology',0,1,.05,v=>Math.round(v*100)+'%','How much experts listen to each other and tune out the crowd.'],
+ ['leak','Residual-stream leak',0,.2,.005,v=>v.toFixed(3),'How readily evidence-backed dissent gets flagged and heard.'],
+ ['scrut','Scrutiny accuracy',.5,1,.01,v=>Math.round(v*100)+'%','Chance the test of a flagged opinion gets it right.'],
+ ['tau','Expert paradigm inertia',50,1000,10,v=>v+' ticks','How slowly the experts’ evidence catches up after a shift.'],
+ ['period','Truth shifts every',100,1500,50,v=>v+' ticks','The fishery changes underneath everyone.'],
+ ['cred','Credentialed share',.05,.5,.01,v=>Math.round(v*100)+'%','Resets the bay.'],
+ ['mav','Hidden mavericks',0,.1,.005,v=>(v*100).toFixed(1)+'%','Low-credential voters with sharp evidence. Resets the bay.'],
+ ['speed','Speed',1,10,1,v=>v+'×','Ticks per frame.']];
+const PRE=[
+ ['One person, one vote',{alpha:0,layer:0,leak:0}],
+ ['Gated technocracy',{alpha:3,layer:.9,leak:0,scrut:.85}],
+ ['Technocracy + residual stream',{alpha:3,layer:.9,leak:.06,scrut:.85}],
+ ['Credulous stream',{alpha:3,layer:.9,leak:.15,scrut:.55}]];
+$('ctl').innerHTML=SL.map(([k,l,mn,mx,st,f,h])=>`<div><label for="s_${k}">${l}<output id="o_${k}">${f(P[k])}</output></label><input type="range" id="s_${k}" min="${mn}" max="${mx}" step="${st}" value="${P[k]}"><small>${h}</small></div>`).join('');
+$('presets').innerHTML=PRE.map((p,i)=>`<button data-p="${i}" aria-pressed="false">${p[0]}</button>`).join('');
+function syncUI(){for(const [k,,,,,f] of SL){$('s_'+k).value=P[k];$('o_'+k).textContent=f(P[k])}}
+for(const [k,,,,,f] of SL){$('s_'+k).addEventListener('input',e=>{P[k]=+e.target.value;$('o_'+k).textContent=f(P[k]);
+ document.querySelectorAll('#presets button').forEach(b=>b.setAttribute('aria-pressed','false'));if(k==='cred'||k==='mav')init()})}
+$('presets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;Object.assign(P,PRE[+b.dataset.p][1]);syncUI();
+ document.querySelectorAll('#presets button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));init()});
+$('auto').addEventListener('change',e=>P.auto=e.target.checked);
+$('showMav').addEventListener('change',e=>{P.showMav=e.target.checked;draw()});
+let running=true;
+$('play').addEventListener('click',()=>{running=!running;$('play').textContent=running?'Pause':'Play'});
+$('step').addEventListener('click',()=>{step();render()});
+$('shift').addEventListener('click',()=>{shift();render()});
+$('reset').addEventListener('click',()=>{init();render()});
+const cv=$('cv'),cx=cv.getContext('2d'),ch=$('ch'),hx=ch.getContext('2d');
+function fit(c,ctx){const r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=Math.max(1,r.width*d);c.height=Math.max(1,r.height*d);ctx.setTransform(d,0,0,d,0,0);return r}
+let bw=0,cw2=0,chh=0;
+const ro=new ResizeObserver(()=>{bw=fit(cv,cx).width;const r=fit(ch,hx);cw2=r.width;chh=r.height;render()});ro.observe($('sq'));ro.observe(ch);
+function draw(){
+ if(!bw)return;const s=bw/N;cx.fillStyle='#0a1d1b';cx.fillRect(0,0,bw,bw);
+ for(let i=0;i<NN;i++){const x=(i%N)*s,y=((i/N)|0)*s;cx.fillStyle=COL[op[i]];
+  if(cls[i]===1){cx.fillRect(x+.5,y+.5,s-1,s-1)}
+  else{const r=s*(.3+.14*Math.min(1,cred[i]+earned[i]));cx.beginPath();cx.arc(x+s/2,y+s/2,r,0,7);cx.fill();
+   if(earned[i]>.2){cx.strokeStyle='#fff';cx.lineWidth=Math.max(1,s*.12);cx.stroke()}}
+  if(P.showMav&&cls[i]===2){cx.fillStyle='#fff';cx.fillRect(x+s*.38,y+s*.38,s*.24,s*.24)}}
+ cx.strokeStyle='#ffd60a';cx.lineWidth=Math.max(1.5,s*.16);
+ for(const f of flagged){cx.beginPath();cx.arc((f%N)*s+s/2,((f/N)|0)*s+s/2,s*.62,0,7);cx.stroke()}
+}
+function chart(){
+ if(!cw2)return;const W=cw2,H=chh,pl=34,pb=8,pt=10,pr=8;const st=getComputedStyle(document.body);
+ const ink=st.color,acc=st.getPropertyValue('--acc').trim()||'#c2410c',mute=st.getPropertyValue('--mute').trim();
+ hx.clearRect(0,0,W,H);hx.font='12px Archivo,sans-serif';hx.fillStyle=mute;hx.strokeStyle=mute;hx.globalAlpha=.25;hx.lineWidth=1;
+ for(const g of [0,.5,1]){const y=pt+(1-g)*(H-pt-pb);hx.beginPath();hx.moveTo(pl,y);hx.lineTo(W-pr,y);hx.stroke()}
+ hx.globalAlpha=1;for(const g of [0,.5,1])hx.fillText(Math.round(g*100)+'%',2,pt+(1-g)*(H-pt-pb)+4);
+ const n=hist.length,x0=tick-n+1,X=t=>pl+(t-x0)/599*(W-pl-pr);
+ hx.setLineDash([3,3]);for(const t of shifts)if(t>=x0){hx.beginPath();hx.moveTo(X(t),pt);hx.lineTo(X(t),H-pb);hx.stroke()}hx.setLineDash([]);
+ [[2,'#8aa19d',1.5],[1,acc,2],[0,ink,2.5]].forEach(([k,c,lw])=>{hx.strokeStyle=c;hx.lineWidth=lw;hx.beginPath();
+  hist.forEach((h,i)=>{const x=X(x0+i),y=pt+(1-h[k])*(H-pt-pb);i?hx.lineTo(x,y):hx.moveTo(x,y)});hx.stroke()});
+}
+const pct=v=>Math.round(v*100)+'%';
+function panel(){
+ $('mAll').textContent=pct(frac.all);$('mCred').textContent=pct(frac.cred);$('mCrowd').textContent=pct(frac.crowd);
+ if(recovering){$('mRec').textContent=(tick-shiftTick)+'';$('mRecL').textContent='ticks since shift, not yet recovered'}
+ else{$('mRec').textContent=lastRecov==null?'–':lastRecov+'';$('mRecL').textContent='ticks to recover from last shift'}
+ $('legend').innerHTML=LAB.map((l,k)=>`<div class="lg"><i style="background:${COL[k]}"></i><span>${l}${k===T?'<em>true now</em>':k===Pv&&Pv!==T?'<em style="color:var(--mute)">was true</em>':''}</span><span class="num">${pct(frac.counts[k]/NN)}</span><div class="bar"><div style="width:${frac.counts[k]/NN*100}%;background:${COL[k]}"></div></div></div>`).join('');
+ $('rNow').textContent=flagged.size;$('rTot').textContent=stats.tot;$('rTA').textContent=stats.TA;$('rFR').textContent=stats.FR;$('rTR').textContent=stats.TR;$('rFA').textContent=stats.FA;
+}
+function render(){draw();chart();panel()}
+let hov=-1;
+function inspect(e){const r=cv.getBoundingClientRect(),gx=Math.floor((e.clientX-r.left)/r.width*N),gy=Math.floor((e.clientY-r.top)/r.height*N);
+ if(gx<0||gy<0||gx>=N||gy>=N)return;hov=gy*N+gx;showInfo()}
+function showInfo(){if(hov<0)return;const i=hov,kind=cls[i]===1?'Credentialed':cls[i]===2&&P.showMav?'Maverick':'Crowd member';
+ $('info').textContent=`${kind} at ${i%N},${(i/N)|0}: believes “${LAB[op[i]]}”, credential ${cred[i].toFixed(2)}${earned[i]>0?', earned stake '+earned[i].toFixed(2):''}${flag[i]>0?', flagged ('+flag[i]+' ticks to test)':''}.`}
+cv.addEventListener('pointermove',inspect);cv.addEventListener('pointerdown',inspect);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduce){running=false;$('play').textContent='Play'}
+init();for(let i=0;i<5;i++)step();render();
+let fr=0;
+function loop(){if(running){for(let i=0;i<P.speed;i++)step();fr++;draw();if(fr%2===0){chart();panel();showInfo()}}requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+}
+</script>
+</body></html>
